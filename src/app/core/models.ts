@@ -22,6 +22,28 @@ export type LossItem = {
   expertNotes: string[]
 }
 
+export type QuoteChange = {
+  revision: number
+  itemId: string
+  category: string
+  fromVersion: number
+  toVersion: number
+  fromAmount: number
+  toAmount: number
+  reason: string
+  operator: string
+  at: string
+}
+
+export type ApprovalDecision = {
+  status: '已通过' | '已退回'
+  operator: string
+  comment: string
+  completedAt: string
+  basisRevision: number
+  invalidatedByRevision: number
+}
+
 export type ApprovalStep = {
   role: string
   threshold: number
@@ -29,6 +51,8 @@ export type ApprovalStep = {
   operator?: string
   comment?: string
   completedAt?: string
+  basisRevision?: number
+  history?: ApprovalDecision[]
 }
 
 export type ClaimCase = {
@@ -44,9 +68,19 @@ export type ClaimCase = {
   reserve: number
   paid: number
   deductible: number
+  quoteRevision: number
+  quoteChanges: QuoteChange[]
   lossItems: LossItem[]
   approvals: ApprovalStep[]
   audit: Array<{ id: string; at: string; operator: string; action: string; detail: string }>
+}
+
+export type BasisConflict = {
+  error: 'BASIS_STALE'
+  message: string
+  submittedRevision: number
+  currentRevision: number
+  changedItems: QuoteChange[]
 }
 
 export type ClaimFilters = {

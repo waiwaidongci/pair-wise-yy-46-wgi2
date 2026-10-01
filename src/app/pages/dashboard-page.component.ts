@@ -14,6 +14,7 @@ import { Store } from '@ngrx/store'
 import type { Observable } from 'rxjs'
 import { StatusChipComponent } from '../shared/status-chip.component'
 import type { ClaimCase } from '../core/models'
+import { basisNoticeText, pendingReReviewRoles } from '../core/basis'
 import { selectAllClaims, selectFilters, selectFilteredClaims, selectClaim, setFilters, type AppState } from '../core/claims.store'
 
 @Component({
@@ -112,7 +113,10 @@ import { selectAllClaims, selectFilters, selectFilteredClaims, selectClaim, setF
               </ng-container>
               <ng-container matColumnDef="status">
                 <th mat-header-cell *matHeaderCellDef>状态</th>
-                <td mat-cell *matCellDef="let claim"><app-status-chip [label]="claim.status" [tone]="claim.status === '待复核' ? 'warn' : 'good'" /></td>
+                <td mat-cell *matCellDef="let claim">
+                  <app-status-chip [label]="claim.status" [tone]="claim.status === '待复核' ? 'warn' : 'good'" />
+                  <small class="basis-flag" *ngIf="pendingRoles(claim).length">{{ basisText(claim) }}</small>
+                </td>
               </ng-container>
               <ng-container matColumnDef="action">
                 <th mat-header-cell *matHeaderCellDef></th>
@@ -152,6 +156,7 @@ import { selectAllClaims, selectFilters, selectFilteredClaims, selectClaim, setF
     table { width: 100%; min-width: 760px; }
     td strong, td small { display: block; }
     td small { margin-top: 4px; color: #7b8790; }
+    .basis-flag { max-width: 220px; color: #a5511f !important; font-size: 10px; line-height: 1.5; }
     .risk-panel { align-self: start; }
     .rule-list { padding: 12px 16px; }
     .rule-list div { display: flex; justify-content: space-between; gap: 8px; padding: 11px 0; border-bottom: 1px solid #edf0f2; font-size: 12px; }
@@ -185,6 +190,14 @@ export class DashboardPageComponent {
 
   updateFilter(key: string, value: string) {
     this.store.dispatch(setFilters({ filters: { [key]: value, page: 1 } }))
+  }
+
+  basisText(claim: ClaimCase) {
+    return basisNoticeText(claim)
+  }
+
+  pendingRoles(claim: ClaimCase) {
+    return pendingReReviewRoles(claim)
   }
 
   open(id: string) {

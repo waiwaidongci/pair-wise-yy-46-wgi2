@@ -14,6 +14,21 @@ export const seedClaims: ClaimCase[] = [
     reserve: 1860000,
     paid: 0,
     deductible: 50000,
+    quoteRevision: 2,
+    quoteChanges: [
+      {
+        revision: 2,
+        itemId: 'LI-01',
+        category: '房屋建筑',
+        fromVersion: 1,
+        toVersion: 2,
+        fromAmount: 680000,
+        toAmount: 742000,
+        reason: '补充檩条更换数量和防火涂层恢复费用',
+        operator: '陈立 / 公估',
+        at: '2026-09-18 16:05',
+      },
+    ],
     lossItems: [
       {
         id: 'LI-01',
@@ -62,7 +77,7 @@ export const seedClaims: ClaimCase[] = [
       },
     ],
     approvals: [
-      { role: '查勘员提交', threshold: 0, status: '已通过', operator: '陆嘉', comment: '现场查勘与资料收集完成。', completedAt: '2026-09-19 10:30' },
+      { role: '查勘员提交', threshold: 0, status: '已通过', operator: '陆嘉', comment: '现场查勘与资料收集完成。', completedAt: '2026-09-19 10:30', basisRevision: 2 },
       { role: '高级核赔员', threshold: 500000, status: '待处理' },
       { role: '理赔经理', threshold: 1000000, status: '待处理' },
       { role: '区域负责人', threshold: 1500000, status: '待处理' },
@@ -87,6 +102,8 @@ export const seedClaims: ClaimCase[] = [
     reserve: 860000,
     paid: 0,
     deductible: 20000,
+    quoteRevision: 1,
+    quoteChanges: [],
     lossItems: [
       {
         id: 'LI-11',
@@ -114,7 +131,7 @@ export const seedClaims: ClaimCase[] = [
       },
     ],
     approvals: [
-      { role: '查勘员提交', threshold: 0, status: '已通过', operator: '林澈', completedAt: '2026-09-24 17:00' },
+      { role: '查勘员提交', threshold: 0, status: '已通过', operator: '林澈', completedAt: '2026-09-24 17:00', basisRevision: 1 },
       { role: '高级核赔员', threshold: 500000, status: '待处理' },
       { role: '理赔经理', threshold: 1000000, status: '待处理' },
     ],

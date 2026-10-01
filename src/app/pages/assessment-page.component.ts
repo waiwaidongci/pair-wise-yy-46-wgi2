@@ -8,11 +8,14 @@ import { MatFormFieldModule } from '@angular/material/form-field'
 import { MatIconModule } from '@angular/material/icon'
 import { MatInputModule } from '@angular/material/input'
 import { MatSelectModule } from '@angular/material/select'
+import { MatSlideToggleModule } from '@angular/material/slide-toggle'
 import { MatSnackBar } from '@angular/material/snack-bar'
 import { MatTableModule } from '@angular/material/table'
 import { Store } from '@ngrx/store'
 import type { Observable } from 'rxjs'
 import { ClaimsService } from '../core/claims.service'
+import { setMockOffline } from '../core/mock-api.interceptor'
+import { invalidatedRoles } from '../core/basis'
 import type { ClaimCase } from '../core/models'
 import { selectSelectedClaim, updateClaim, type AppState } from '../core/claims.store'
 import { StatusChipComponent } from '../shared/status-chip.component'
@@ -31,6 +34,7 @@ import { StatusChipComponent } from '../shared/status-chip.component'
     MatIconModule,
     MatInputModule,
     MatSelectModule,
+    MatSlideToggleModule,
     MatTableModule,
     StatusChipComponent,
   ],
@@ -43,9 +47,16 @@ import { StatusChipComponent } from '../shared/status-chip.component'
           <p class="muted">{{ claim.lossAddress }} · 事故日 {{ claim.accidentDate }} · 查勘员 {{ claim.adjuster }}</p>
         </div>
         <div class="actions">
+          <mat-slide-toggle [(ngModel)]="offline" (ngModelChange)="toggleOffline($event)">断网模拟</mat-slide-toggle>
           <button mat-stroked-button><mat-icon>upload_file</mat-icon> 上传查勘材料</button>
           <button mat-flat-button color="primary" (click)="saveAll(claim)">保存本次查勘</button>
         </div>
+      </div>
+
+      <div class="retry-bar" *ngIf="pendingQuoteRetry">
+        <mat-icon>cloud_off</mat-icon>
+        <span>网络异常，补录结果未确认（记录号 {{ pendingQuoteRetry.recordId }}）。已生效的记录不会重复追加，请按原记录号重试。</span>
+        <button mat-flat-button color="primary" (click)="retryQuote()">按原记录号重试</button>
       </div>
 
       <div class="summary-grid">
@@ -126,6 +137,8 @@ import { StatusChipComponent } from '../shared/status-chip.component'
   `,
   styles: [`
     .summary-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; margin-bottom: 14px; }
+    .retry-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding: 10px 16px; border: 1px solid #e5b8b8; border-left: 4px solid #c05353; border-radius: 8px; background: #fdf0f0; color: #8c3a3a; font-size: 12px; }
+    .retry-bar span { flex: 1; }
     .summary-grid mat-card { padding: 15px; border-color: #dce3e6; }
     .summary-grid span, .summary-grid small { display: block; color: #6e7a83; font-size: 12px; }
     .summary-grid strong { display: block; margin: 6px 0; color: #153747; font-size: 24px; }
@@ -166,6 +179,8 @@ export class AssessmentPageComponent {
   quotingItemId = ''
   quoteAmount = 0
   quoteReason = ''
+  offline = false
+  pendingQuoteRetry: { claimId: string; recordId: string; body: { itemId: string; amount: number; reason: string; recordId: string } } | null = null
   draft = localStorage.getItem('claims-assessment-draft') ?? '待补充房屋檩条第三方复测依据，并核对存货库龄核减。'
 
   constructor(
@@ -206,21 +221,48 @@ export class AssessmentPageComponent {
 
   submitQuote(claimId: string, itemId: string) {
     if (!this.quoteReason.trim()) return
-    this.service.addQuote(claimId, { itemId, amount: Number(this.quoteAmount), reason: this.quoteReason }).subscribe(() => {
-      this.store.select(selectSelectedClaim).subscribe((claim) => this.store.dispatch(updateClaim({ claim: structuredClone(claim) })))
-      this.snackBar.open('新报价版本已生成，原记录保持可追溯', '关闭', { duration: 2200 })
-      this.quotingItemId = ''
+    const recordId = `R-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+    const body = { itemId, amount: Number(this.quoteAmount), reason: this.quoteReason, recordId }
+    this.sendQuote(claimId, recordId, body)
+  }
+
+  retryQuote() {
+    const pending = this.pendingQuoteRetry
+    if (pending) this.sendQuote(pending.claimId, pending.recordId, pending.body)
+  }
+
+  toggleOffline(value: boolean) {
+    setMockOffline(value)
+  }
+
+  private sendQuote(claimId: string, recordId: string, body: { itemId: string; amount: number; reason: string; recordId: string }) {
+    this.service.addQuote(claimId, body).subscribe({
+      next: ({ claim, replayed }) => {
+        this.store.dispatch(updateClaim({ claim, silent: true }))
+        this.pendingQuoteRetry = null
+        this.quotingItemId = ''
+        const invalidated = invalidatedRoles(claim)
+        const suffix = invalidated.length ? `；报价 V${claim.quoteRevision} 使「${invalidated.join('、')}」会签失效，待重新复核` : ''
+        this.snackBar.open(replayed ? `记录 ${recordId} 已生效，未重复追加` : `新报价版本已生成，原记录保持可追溯${suffix}`, '关闭', { duration: 3000 })
+      },
+      error: (error) => {
+        if (error.status === 0) {
+          this.pendingQuoteRetry = { claimId, recordId, body }
+          return
+        }
+        this.snackBar.open('报价提交失败，请稍后重试', '关闭', { duration: 2400 })
+      },
     })
   }
 
   saveAll(claim: any) {
     localStorage.setItem('claims-assessment-draft', this.draft)
-    this.store.dispatch(updateClaim({ claim: structuredClone(claim) }))
+    this.store.dispatch(updateClaim({ claim: structuredClone(claim), silent: true }))
     this.snackBar.open('查勘数据和草稿已保存', '关闭', { duration: 1800 })
   }
 
   saveDraft(claim: any) {
     localStorage.setItem('claims-assessment-draft', this.draft)
-    this.store.dispatch(updateClaim({ claim: structuredClone(claim) }))
+    this.store.dispatch(updateClaim({ claim: structuredClone(claim), silent: true }))
   }
 }

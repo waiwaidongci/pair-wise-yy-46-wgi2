@@ -7,6 +7,7 @@ import { MatSnackBar } from '@angular/material/snack-bar'
 import { Store } from '@ngrx/store'
 import type { Observable } from 'rxjs'
 import type { ClaimCase } from '../core/models'
+import { basisNoticeText } from '../core/basis'
 import { selectSelectedClaim, saveDraft, type AppState } from '../core/claims.store'
 import { StatusChipComponent } from '../shared/status-chip.component'
 
@@ -45,6 +46,11 @@ import { StatusChipComponent } from '../shared/status-chip.component'
         </section>
 
         <aside>
+          <section class="panel basis-panel">
+            <div class="panel-head"><h3>待复核依据</h3><span class="muted">报价 V{{ claim.quoteRevision }}</span></div>
+            <p class="basis-text">{{ basisText(claim) }}</p>
+          </section>
+
           <section class="panel">
             <div class="panel-head"><h3>附件版本</h3><span class="muted">只增不删</span></div>
             <div class="file-list">
@@ -82,6 +88,8 @@ import { StatusChipComponent } from '../shared/status-chip.component'
     .event p { margin: 6px 0; color: #56656e; font-size: 12px; line-height: 1.55; }
     .event small { color: #89949b; font-size: 10px; }
     aside { display: grid; gap: 14px; }
+    .basis-panel { border-left: 3px solid #2f8191; }
+    .basis-text { margin: 0; padding: 12px 16px 14px; color: #4d6069; font-size: 12px; line-height: 1.6; }
     .file-list { padding: 8px 14px 16px; }
     .file-list > div { padding: 10px 0; border-bottom: 1px solid #edf0f2; }
     .file-list article { display: grid; grid-template-columns: 28px minmax(0,1fr) auto; gap: 8px; align-items: center; padding: 8px; margin-top: 6px; background: #f5f7f7; border-radius: 6px; }
@@ -114,8 +122,12 @@ export class AuditPageComponent {
     this.store.dispatch(saveDraft({ draft: `草稿更新于 ${new Date().toLocaleString('zh-CN')}` }))
   }
 
+  basisText(claim: ClaimCase) {
+    return basisNoticeText(claim)
+  }
+
   exportAudit(claim: any) {
-    const lines = ['时间,操作者,动作,说明', ...claim.audit.map((event: any) => [event.at, event.operator, event.action, event.detail].map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(','))]
+    const lines = ['记录编号,时间,操作者,动作,说明', ...claim.audit.map((event: any) => [event.id, event.at, event.operator, event.action, event.detail].map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(','))]
     const url = URL.createObjectURL(new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8' }))
     const link = document.createElement('a')
     link.href = url

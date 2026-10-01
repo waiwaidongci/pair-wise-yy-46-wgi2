@@ -1,6 +1,9 @@
 import { HttpClient, HttpParams } from '@angular/common/http'
 import { Injectable } from '@angular/core'
+import { map } from 'rxjs'
 import type { ClaimCase, ClaimFilters, PagedClaims } from './models'
+
+export type MutationResult = { claim: ClaimCase; replayed: boolean }
 
 @Injectable({ providedIn: 'root' })
 export class ClaimsService {
@@ -20,11 +23,15 @@ export class ClaimsService {
     return this.http.get<ClaimCase>(`/api/claims/${id}`)
   }
 
-  addQuote(claimId: string, body: { itemId: string; amount: number; reason: string }) {
-    return this.http.post(`/api/claims/${claimId}/quotes`, body)
+  addQuote(claimId: string, body: { itemId: string; amount: number; reason: string; recordId: string; operator?: string }) {
+    return this.http
+      .post<ClaimCase>(`/api/claims/${claimId}/quotes`, body, { observe: 'response' })
+      .pipe(map((response) => ({ claim: response.body!, replayed: response.headers.get('X-Idempotent-Replay') === 'true' })))
   }
 
-  approve(claimId: string, body: { role: string; result: string; comment: string }) {
-    return this.http.post(`/api/claims/${claimId}/approvals`, body)
+  approve(claimId: string, body: { role: string; result: string; comment: string; basisRevision: number; recordId: string }) {
+    return this.http
+      .post<ClaimCase>(`/api/claims/${claimId}/approvals`, body, { observe: 'response' })
+      .pipe(map((response) => ({ claim: response.body!, replayed: response.headers.get('X-Idempotent-Replay') === 'true' })))
   }
 }
