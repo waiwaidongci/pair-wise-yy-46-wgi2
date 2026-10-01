@@ -22,13 +22,44 @@ export type LossItem = {
   expertNotes: string[]
 }
 
+export type ApprovalStatus = '待处理' | '已通过' | '已退回' | '已失效'
+
+/** 报价版本依据：损失科目 id -> 该科目当前最新报价版本号 */
+export type QuoteBasis = Record<string, number>
+
+/** 审批提交时携带的依据快照与当前依据不一致的科目 */
+export type BasisChange = {
+  itemId: string
+  category: string
+  description: string
+  fromVersion: number
+  toVersion: number
+  fromAmount: number
+  toAmount: number
+}
+
 export type ApprovalStep = {
   role: string
   threshold: number
-  status: '待处理' | '已通过' | '已退回'
+  status: ApprovalStatus
   operator?: string
   comment?: string
   completedAt?: string
+  /** 批准时依据的报价版本快照（科目 id -> 版本号） */
+  basis?: QuoteBasis
+  /** 使本步骤失效的报价版本，如 V3 */
+  invalidatedBy?: string
+  invalidatedAt?: string
+  /** 依据变化产生冲突时保留的审批意见 */
+  pendingComment?: string
+}
+
+export type AuditEvent = {
+  id: string
+  at: string
+  operator: string
+  action: string
+  detail: string
 }
 
 export type ClaimCase = {
@@ -46,7 +77,7 @@ export type ClaimCase = {
   deductible: number
   lossItems: LossItem[]
   approvals: ApprovalStep[]
-  audit: Array<{ id: string; at: string; operator: string; action: string; detail: string }>
+  audit: AuditEvent[]
 }
 
 export type ClaimFilters = {

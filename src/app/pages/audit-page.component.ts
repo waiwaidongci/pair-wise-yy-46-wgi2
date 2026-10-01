@@ -9,11 +9,12 @@ import type { Observable } from 'rxjs'
 import type { ClaimCase } from '../core/models'
 import { selectSelectedClaim, saveDraft, type AppState } from '../core/claims.store'
 import { StatusChipComponent } from '../shared/status-chip.component'
+import { BasisSummaryComponent } from '../shared/basis-summary.component'
 
 @Component({
   selector: 'app-audit-page',
   standalone: true,
-  imports: [CommonModule, MatButtonModule, MatCardModule, MatIconModule, StatusChipComponent],
+  imports: [CommonModule, MatButtonModule, MatCardModule, MatIconModule, StatusChipComponent, BasisSummaryComponent],
   template: `
     <section class="page" *ngIf="claim$ | async as claim">
       <div class="page-head">
@@ -45,6 +46,8 @@ import { StatusChipComponent } from '../shared/status-chip.component'
         </section>
 
         <aside>
+          <app-basis-summary [claim]="claim" />
+
           <section class="panel">
             <div class="panel-head"><h3>附件版本</h3><span class="muted">只增不删</span></div>
             <div class="file-list">

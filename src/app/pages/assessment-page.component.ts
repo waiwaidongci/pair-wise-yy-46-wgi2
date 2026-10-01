@@ -15,6 +15,7 @@ import type { Observable } from 'rxjs'
 import { ClaimsService } from '../core/claims.service'
 import type { ClaimCase } from '../core/models'
 import { selectSelectedClaim, updateClaim, type AppState } from '../core/claims.store'
+import { newRecordId } from '../core/basis'
 import { StatusChipComponent } from '../shared/status-chip.component'
 
 @Component({
@@ -166,6 +167,8 @@ export class AssessmentPageComponent {
   quotingItemId = ''
   quoteAmount = 0
   quoteReason = ''
+  private current: ClaimCase | null = null
+  private lastQuote: { itemId: string; amount: number; reason: string; clientMsgId: string } | null = null
   draft = localStorage.getItem('claims-assessment-draft') ?? '待补充房屋檩条第三方复测依据，并核对存货库龄核减。'
 
   constructor(
@@ -174,6 +177,7 @@ export class AssessmentPageComponent {
     private readonly snackBar: MatSnackBar,
   ) {
     this.claim$ = this.store.select(selectSelectedClaim)
+    this.claim$.subscribe((claim) => (this.current = claim))
     this.store.select((state) => state.claims.draft).subscribe((draft) => (this.draft = draft))
   }
 
@@ -206,11 +210,56 @@ export class AssessmentPageComponent {
 
   submitQuote(claimId: string, itemId: string) {
     if (!this.quoteReason.trim()) return
-    this.service.addQuote(claimId, { itemId, amount: Number(this.quoteAmount), reason: this.quoteReason }).subscribe(() => {
-      this.store.select(selectSelectedClaim).subscribe((claim) => this.store.dispatch(updateClaim({ claim: structuredClone(claim) })))
-      this.snackBar.open('新报价版本已生成，原记录保持可追溯', '关闭', { duration: 2200 })
-      this.quotingItemId = ''
+    const body = { itemId, amount: Number(this.quoteAmount), reason: this.quoteReason.trim(), clientMsgId: newRecordId() }
+    this.lastQuote = body
+    this.service.addQuote(claimId, body).subscribe({
+      next: (updated) => {
+        this.applyServerClaim(updated)
+        const item = updated.lossItems.find((loss) => loss.id === itemId)
+        const latest = item?.repairQuotes.at(-1)?.version
+        const invalidated = updated.approvals
+          .filter((step) => step.status === '已失效' && step.invalidatedBy === `V${latest}`)
+          .map((step) => step.role)
+        this.snackBar.open(
+          invalidated.length ? `新报价 V${latest} 已生成；${invalidated.join('、')} 的会签依据已失效，需重新会签` : '新报价版本已生成，原记录保持可追溯',
+          '关闭',
+          { duration: 3200 },
+        )
+        this.quotingItemId = ''
+        this.lastQuote = null
+      },
+      error: () => {
+        const snack = this.snackBar.open('网络异常，报价未提交；可按原记录号重试', '重试', { duration: 4000 })
+        snack.onAction().subscribe(() => this.retryLastQuote(claimId))
+      },
     })
+  }
+
+  /** 断网补录失败后按原记录号重试；服务端幂等去重，已生效不重复追加 */
+  retryLastQuote(claimId: string) {
+    if (!this.lastQuote) return
+    const body = this.lastQuote
+    this.service.addQuote(claimId, body).subscribe({
+      next: (updated) => {
+        this.applyServerClaim(updated)
+        this.snackBar.open('补录成功（按原记录号重试，未重复追加）', '关闭', { duration: 2400 })
+        this.quotingItemId = ''
+        this.lastQuote = null
+      },
+      error: () => {
+        this.snackBar.open('仍无法连接，原记录号已保留，可稍后重试', '关闭', { duration: 2400 })
+      },
+    })
+  }
+
+  /** 合并服务端案件，保留本地编辑（查勘事实/残值/责任比例） */
+  private applyServerClaim(server: ClaimCase) {
+    const local = this.current ?? server
+    const lossItems = server.lossItems.map((serverItem) => {
+      const localItem = local.lossItems.find((candidate) => candidate.id === serverItem.id)
+      return localItem ? { ...serverItem, damage: localItem.damage, salvage: localItem.salvage, liability: localItem.liability } : serverItem
+    })
+    this.store.dispatch(updateClaim({ claim: { ...server, lossItems } }))
   }
 
   saveAll(claim: any) {

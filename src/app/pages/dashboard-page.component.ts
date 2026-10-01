@@ -13,8 +13,9 @@ import { MatProgressBarModule } from '@angular/material/progress-bar'
 import { Store } from '@ngrx/store'
 import type { Observable } from 'rxjs'
 import { StatusChipComponent } from '../shared/status-chip.component'
+import { BasisSummaryComponent } from '../shared/basis-summary.component'
 import type { ClaimCase } from '../core/models'
-import { selectAllClaims, selectFilters, selectFilteredClaims, selectClaim, setFilters, type AppState } from '../core/claims.store'
+import { selectAllClaims, selectFilters, selectFilteredClaims, selectSelectedClaim, selectClaim, setFilters, type AppState } from '../core/claims.store'
 
 @Component({
   selector: 'app-dashboard-page',
@@ -32,6 +33,7 @@ import { selectAllClaims, selectFilters, selectFilteredClaims, selectClaim, setF
     MatTableModule,
     MatProgressBarModule,
     StatusChipComponent,
+    BasisSummaryComponent,
   ],
   template: `
     <section class="page">
@@ -137,6 +139,8 @@ import { selectAllClaims, selectFilters, selectFilteredClaims, selectClaim, setF
             <div><strong>当前案件触发四级会签</strong><p>涉及房屋建筑与设备报价调整，需补充第三方依据后方可通过。</p></div>
           </div>
         </aside>
+
+        <app-basis-summary *ngIf="selectedClaim$ | async as selected" [claim]="selected" />
       </div>
     </section>
   `,
@@ -166,6 +170,7 @@ export class DashboardPageComponent {
   claims$: Observable<ClaimCase[]>
   filteredClaims$: Observable<ClaimCase[]>
   filters$: Observable<import('../core/models').ClaimFilters>
+  selectedClaim$: Observable<ClaimCase | undefined>
   totalReserve$: Observable<number>
   pendingApprovals$: Observable<number>
   disputedItems$: Observable<number>
@@ -178,6 +183,7 @@ export class DashboardPageComponent {
     this.claims$ = this.store.select(selectAllClaims)
     this.filteredClaims$ = this.store.select(selectFilteredClaims)
     this.filters$ = this.store.select(selectFilters)
+    this.selectedClaim$ = this.store.select(selectSelectedClaim)
     this.totalReserve$ = this.store.select((state) => state.claims.items.reduce((sum, claim) => sum + claim.reserve, 0))
     this.pendingApprovals$ = this.store.select((state) => state.claims.items.reduce((sum, claim) => sum + claim.approvals.filter((step) => step.status === '待处理').length, 0))
     this.disputedItems$ = this.store.select((state) => state.claims.items.reduce((sum, claim) => sum + claim.lossItems.filter((item) => item.disputed).length, 0))
